@@ -1,4 +1,9 @@
-# InscribeVerse Meta-Engine Platform 🚀
+# InscribeVerse - Fast API Server 🚀
+
+**🎉 Build APIs at the speed of thought with InscribeVerse Meta-Engine!**
+
+_Transform schemas into production-ready APIs in minutes, not weeks._
+
 
 **Schema-driven API generation system** that transforms data definitions into complete REST APIs automatically.
 
@@ -58,8 +63,8 @@ InscribeVerse is a **meta-engine** that eliminates repetitive API development. D
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd InscribeVerse/server-p
+git clone https://github.com/sidjain0503/server-p.git
+cd server-p
 
 # Create virtual environment
 python -m venv venv
@@ -429,42 +434,6 @@ curl -H "Authorization: Bearer $TOKEN" \
 3. Enter test data and execute
 4. See real-time results
 
-## 🔮 What's Next?
-
-- ✅ **Authentication System**: JWT-based user management _(Completed)_
-- ✅ **Flexible Route Protection**: Public/protected route configuration _(Completed)_
-- 🔄 **OAuth Integration**: Google, LinkedIn, GitHub providers
-- 🎨 **Frontend Integration**: React/Vue dashboard with auth
-- 📈 **Advanced Schemas**: Complex relationships & joins
-- 🔄 **Real-time APIs**: WebSocket integration
-- 📊 **Analytics Dashboard**: Built-in metrics & monitoring
-- 🏢 **Multi-tenancy**: Organization & workspace support
-- 📦 **Schema Marketplace**: Pre-built domain packages
-- ☁️ **Cloud Deployment**: AWS/GCP/Azure ready
-- 🔍 **Advanced Search**: Full-text search & filtering
-- 📧 **Notification System**: Email, SMS, push notifications
-
-## 🤝 Contributing
-
-InscribeVerse is designed for rapid development and easy extension:
-
-1. **Fork the repository**
-2. **Add your schemas** in `app/models/schemas/`
-3. **Register them** in the registry
-4. **Add custom routes** if needed
-5. **Test and deploy**
-
-## 📖 Learn More
-
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [SQLAlchemy 2.0 Guide](https://docs.sqlalchemy.org/en/20/)
-- [Pydantic Documentation](https://docs.pydantic.dev/)
-
----
-
-**🎉 Build APIs at the speed of thought with InscribeVerse Meta-Engine!**
-
-_Transform schemas into production-ready APIs in minutes, not weeks._
 
 ## 🔐 Authentication System
 
