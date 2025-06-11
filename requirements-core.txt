@@ -1,0 +1,14 @@
+# Core FastAPI Dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database Dependencies
+sqlalchemy==2.0.23
+asyncpg==0.29.0
+
+# Data Validation & Settings
+pydantic==2.5.0
+pydantic-settings==2.0.3
+
+# Utilities
+python-dotenv==1.0.0 

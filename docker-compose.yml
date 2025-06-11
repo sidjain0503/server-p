@@ -1,0 +1,258 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # FastAPI Application
+  # =============================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: inscribeverse-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://inscribeverse:dev_password@postgres:5432/inscribeverse_dev
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - inscribeverse-network
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # =============================================================================
+  # PostgreSQL Database
+  # =============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: inscribeverse-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: inscribeverse_dev
+      POSTGRES_USER: inscribeverse
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inscribeverse -d inscribeverse_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - inscribeverse-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Redis Cache & Session Store
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: inscribeverse-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - inscribeverse-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Adminer Database Management Interface
+  # =============================================================================
+  adminer:
+    image: adminer:latest
+    container_name: inscribeverse-adminer
+    ports:
+      - "8080:8080"  # Using 8081 to avoid conflict with your existing Adminer
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha-dark  # Nice dark theme
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - inscribeverse-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Celery Worker (Background Tasks)
+  # =============================================================================
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: inscribeverse-celery-worker
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://inscribeverse:dev_password@postgres:5432/inscribeverse_dev
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - inscribeverse-network
+    restart: unless-stopped
+    command: celery -A app.core.celery worker --loglevel=info
+
+  # =============================================================================
+  # Celery Beat (Scheduled Tasks)
+  # =============================================================================
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: inscribeverse-celery-beat
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://inscribeverse:dev_password@postgres:5432/inscribeverse_dev
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - inscribeverse-network
+    restart: unless-stopped
+    command: celery -A app.core.celery beat --loglevel=info
+
+  # =============================================================================
+  # Celery Flower (Task Monitoring)
+  # =============================================================================
+  celery-flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: inscribeverse-celery-flower
+    ports:
+      - "5555:5555"
+    volumes:
+      - .:/app
+    environment:
+      - ENVIRONMENT=development
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - redis
+    networks:
+      - inscribeverse-network
+    restart: unless-stopped
+    command: celery -A app.core.celery flower --port=5555
+
+  # =============================================================================
+  # Nginx Reverse Proxy (Optional for development)
+  # =============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: inscribeverse-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./static:/app/static
+    depends_on:
+      - api
+    networks:
+      - inscribeverse-network
+    restart: unless-stopped
+    profiles:
+      - nginx  # Use with: docker-compose --profile nginx up
+
+  # =============================================================================
+  # Monitoring Stack (Optional)
+  # =============================================================================
+  
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: inscribeverse-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - inscribeverse-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Grafana for metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: inscribeverse-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - inscribeverse-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  inscribeverse-network:
+    driver: bridge
+    name: inscribeverse-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    name: inscribeverse-postgres-data
+  redis_data:
+    name: inscribeverse-redis-data
+  prometheus_data:
+    name: inscribeverse-prometheus-data
+  grafana_data:
+    name: inscribeverse-grafana-data 
